@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Averia+Serif+Libre:ital,wght@0,300;0,400;0,700;1,300;1,400;1,700&family=Courier+Prime:ital,wght@0,400;0,700;1,400;1,700&family=Radio+Canada:ital,wght@0,300..700;1,300..700&display=swap" rel="stylesheet">
+
+    <title>Data & Bodies</title>
+</head>
+<style>
+    #main {
+        text-align: center;
+        margin-top: 50px;
+        position: relative;              
+        width: 900px;                    
+        height: 510px;                
+        margin: auto;
+    }
+
+    #overlay {
+      position: absolute;
+      left: 0; top: 0;
+      width: 100%; height: 100%;
+      pointer-events: none;            
+    }
+
+    body{
+        margin:0;
+        font-family: "Radio Canada", sans-serif;
+        background: #f6e9e0;
+        color:#2d3845;
+        }
+        
+        h1{
+        margin: 50px 0 8px;
+        font-size: 25px;
+        font-weight: 700;
+        letter-spacing: 0.2px;
+        font-family: "Averia Serif Libre", serif;
+        text-align: center;
+        }
+        .hint{
+        margin: 0 0 14px;
+        opacity: 0.85;
+        font-size: 14px;
+        line-height: 1.45;
+        text-align: center;
+        }
+
+    .wrap{
+        max-width: 900px;
+        margin: 0 auto;
+        padding: 18px 16px 28px;
+    }
+</style>
+<body>
+    <div class = "wrap">
+        <h1>My Network Nodes and Data of Connection</h1>
+        <p class="hint">QSS 30.19 Data & Bodies Final Project | Isabel Prado-Tucker</p>
+        <div id = "main">
+            <svg id="overlay" viewBox="0 0 900 510"></svg>
+        </div>
+        <p>In this project, I explore digital methods of connection between my family members and I, as we live and travel across the world. 
+            My key inspiration and source of data for this project is the FindMy app, which I use frequently for utility and leisure:
+            to meet up with friends and out of curiousity. I also explore the other digital mediums in which I mantain both in-person and long-distance relationships,
+            such as messages, phone calls, DMs, memes, Strava, Spotify, and more.</p>
+    </div>
+</body>
+<script>
+    const svg = d3.select("#main")
+        .append("svg")
+        .attr("width", 900)
+        .attr("height", 510);
+
+    svg.append("image")
+    .attr("xlink:href", "Bodies.png") // Link to the image source
+    .attr("x", 0)                             // X coordinate
+    .attr("y", 0)                             // Y coordinate
+    .attr("width", 900)                       // Image width
+    .attr("height", 510);
+
+    svg.append("image")
+        .attr("xlink:href", "Images/locationOn.png")
+        .attr("x", 690)
+        .attr("y", 410)
+        .attr("width", 200);
+
+    svg.append("image")
+        .attr("xlink:href", "Images/locationOff.png")
+        .attr("x", 690)
+        .attr("y", 410)
+        .style("opacity", 0)
+        .attr("width", 200)
+        .attr("class", "locOff");
+
+    d3.csv('bodies_trajectory.csv').then(rawData => {
+  console.log('Raw data:', rawData);
+  
+  // Convert strings to numbers
+  const data = rawData.map(d => ({
+    name: d.name,
+    step: +d.step,
+    lat: +d.lat,
+    lon: +d.lon,
+    isabel_lat: +d.isabel_lat,
+    isabel_lon: +d.isabel_lon
+  }));
+
+  // Group by name
+  const groupedData = d3.group(data, d => d.name);
+  const formattedData = Array.from(groupedData, ([name, points]) => ({
+    name,
+    points: points.sort((a, b) => a.step - b.step)
+  }));
+
+  const width = 900, height = 510;
+
+  const stretchedProjection = (coords) => {
+    const projection = d3.geoMercator()
+                         .center([0, -22])
+                         .scale(200)
+                         .translate([width/2, height/2]);
+    const [x, y] = projection(coords);
+    return [x, y * 3.5];
+  };
+
+  const color = d3.scaleOrdinal()
+                  .domain(formattedData.map(d => d.name))
+                  .range(d3.schemeTableau10);
+
+  const svg = d3.select('#overlay');
+
+  // Create groups for lines and triangles
+  const linesGroup = svg.append('g').attr('class', 'lines');
+  const trianglesGroup = svg.append('g').attr('class', 'triangles');
+
+  // Create groups for each person (circles)
+  const persons = svg.selectAll('.person')
+                    .data(formattedData)
+                    .enter()
+                    .append('g')
+                    .attr('class','person');
+
+  persons.append('circle')
+         .attr('r', 5)
+         .attr('fill', d => color(d.name));
+        // .attr('stroke', '#fff')
+        // .attr('stroke-width', 0.8);
+
+  const maxStep = d3.max(formattedData, d => d3.max(d.points, p => p.step));
+  let step = 1;  // Start at location 1
+  
+  const transitionDuration = 2000;
+  const intervalDelay = transitionDuration + 300;
+
+  const updatePositions = () => {
+    // Update circles and store current positions
+    if (step % 3 == 0) {
+        d3.select(".locOff")
+            .style("opacity", 1);
+    }
+    else {
+        d3.select(".locOff")
+            .style("opacity", 0);
+    }
+    const positions = {};
+    
+    persons.each(function(p) {
+      const pt = p.points[step - 1];
+      if(!pt) return;
+      
+      const [x, y] = stretchedProjection([pt.lon, pt.lat]);
+      positions[p.name] = { x, y };
+      
+      d3.select(this).select('circle')
+        .transition()
+        .duration(transitionDuration)
+        .ease(d3.easeLinear)
+        .attr('cx', x)
+        .attr('cy', y);
+    });
+
+    // Generate all pairs for lines
+    const names = formattedData.map(d => d.name);
+    
+
+    // Generate all triangles (all combinations of 3 people)
+    const triangles = [];
+    
+    for (let i = 0; i < names.length; i++) {
+      for (let j = i + 1; j < names.length; j++) {
+        for (let k = j + 1; k < names.length; k++) {
+          triangles.push({
+            id: `${names[i]}-${names[j]}-${names[k]}`,
+            p1: names[i],
+            p2: names[j],
+            p3: names[k],
+            pos1: positions[names[i]],
+            pos2: positions[names[j]],
+            pos3: positions[names[k]]
+          });
+        }
+      }
+    }
+
+    // Update triangles
+    const triangleSelection = trianglesGroup.selectAll('polygon')
+                                          .data(triangles, d => d.id);
+
+    triangleSelection.enter()
+                    .append('polygon')
+                    .attr('fill', 'grey')
+                    .attr('fill-opacity', 0.1)
+                    //.attr('stroke', '#999')
+                    //.attr('stroke-width', 0.5)
+                    //.attr('stroke-opacity', 0.2)
+                    .merge(triangleSelection)
+                    .transition()
+                    .duration(transitionDuration)
+                    .ease(d3.easeLinear)
+                    .attr('points', d => {
+                      if (!d.pos1 || !d.pos2 || !d.pos3) return '';
+                      return `${d.pos1.x},${d.pos1.y} ${d.pos2.x},${d.pos2.y} ${d.pos3.x},${d.pos3.y}`;
+                    });
+
+    triangleSelection.exit().remove();
+
+    const linePairs = [];
+    
+    for (let i = 0; i < names.length; i++) {
+      for (let j = i + 1; j < names.length; j++) {
+        linePairs.push({
+          from: names[i],
+          to: names[j],
+          fromPos: positions[names[i]],
+          toPos: positions[names[j]]
+        });
+      }
+    }
+
+    // Update lines
+    const lines = linesGroup.selectAll('line')
+                            .data(linePairs, d => `${d.from}-${d.to}`);
+
+    lines.enter()
+         .append('line')
+         .attr('stroke', d => color(d.name))
+         .attr('stroke-width', 0.5)
+         .attr('stroke-opacity', 1)
+         .merge(lines)
+         .transition()
+         .duration(transitionDuration)
+         .ease(d3.easeLinear)
+         .attr('x1', d => d.fromPos ? d.fromPos.x : 0)
+         .attr('y1', d => d.fromPos ? d.fromPos.y : 0)
+         .attr('x2', d => d.toPos ? d.toPos.x : 0)
+         .attr('y2', d => d.toPos ? d.toPos.y : 0);
+
+    lines.exit().remove();
+  };
+
+  // Initial positions
+  updatePositions();
+
+  // Update on interval
+  d3.interval(() => {
+    step++;
+    if(step > maxStep) step = 1;
+    updatePositions();
+  }, intervalDelay);
+});
+</script>
+</html>
