@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Averia+Serif+Libre:ital,wght@0,300;0,400;0,700;1,300;1,400;1,700&family=Courier+Prime:ital,wght@0,400;0,700;1,400;1,700&family=Radio+Canada:ital,wght@0,300..700;1,300..700&display=swap" rel="stylesheet">
+    <script src="https://open.spotify.com/embed/iframe-api/v1" async></script>
 
     <title>Data & Bodies</title>
 </head>
@@ -16,6 +17,7 @@
         width: 900px;                    
         height: 510px;                
         margin: auto;
+        border: 4px solid #2d3845;
     }
 
     #overlay {
@@ -53,6 +55,28 @@
         margin: 0 auto;
         padding: 18px 16px 28px;
     }
+
+    @keyframes fadeInOut {
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.01;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+#map-img {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  animation: fadeInOut 15s infinite;  
+}
 </style>
 <body>
     <div class = "wrap">
@@ -70,15 +94,16 @@
 <script>
     const svg = d3.select("#main")
         .append("svg")
-        .attr("width", 900)
-        .attr("height", 510);
+        .attr("width", 910)
+        .attr("height", 520);
 
     svg.append("image")
     .attr("xlink:href", "Bodies.png") // Link to the image source
-    .attr("x", 0)                             // X coordinate
-    .attr("y", 0)                             // Y coordinate
+    .attr("x", -10)                             // X coordinate
+    .attr("y", -5)                             // Y coordinate
     .attr("width", 900)                       // Image width
-    .attr("height", 510);
+    .attr("height", 530)
+    .attr("id", "map-img");
 
     svg.append("image")
         .attr("xlink:href", "locationOn.png")
@@ -144,7 +169,9 @@
 
   persons.append('circle')
          .attr('r', 5)
-         .attr('fill', d => color(d.name));
+         .attr('fill', d => color(d.name))
+         .attr("fill-opacity", 0.8)
+         .style('pointer-events', 'auto');
         // .attr('stroke', '#fff')
         // .attr('stroke-width', 0.8);
 
@@ -260,6 +287,7 @@
     lines.exit().remove();
   };
 
+  
   // Initial positions
   updatePositions();
 
